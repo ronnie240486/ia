@@ -115,6 +115,5 @@ app.post('/generate-image', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-  console.log(`DEAPI_BACKEND_URL=${DEAPI_BACKEND_URL === 'YOUR_DEAPI_ENDPOINT_URL_HERE' ? '(não configurada)' : DEAPI_BACKEND_URL}`);
+  console.log(`✅ Servidor rodando na porta ${PORT}`);
 });
