@@ -8,7 +8,7 @@ const PORT = process.env.PORT || 8080;
 
 // --- CONFIGURAÇÃO DAS APIS ---
 const DEAPI_BACKEND_URL =
-  process.env.DEAPI_BACKEND_URL || "https://api.deapi.ai/v1/images/generations";
+  const DEAPI_BACKEND_URL = process.env.DEAPI_BACKEND_URL || "https://api.deapi.ai/v1/image";
 const DEAPI_API_KEY = process.env.DEAPI_API_KEY || "";
 
 const POLLINATIONS_URL = "https://pollinations.ai/prompt/";
