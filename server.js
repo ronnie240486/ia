@@ -6,10 +6,10 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // LEIA A URL DO BACKEND DA DEAPI E A CHAVE AQUI (defina no Railway como variáveis de ambiente)
-const DEAPI_BACKEND_URL = process.env.DEAPI_BACKEND_URL || 'YOUR_DEAPI_ENDPOINT_URL_HERE';
+const DEAPI_BACKEND_URL = process.env.DEAPI_BACKEND_URL || '287|3JMRYgtTrUuaPH0skM69mbXE4Reg2DhhfWTD49LK518314a1';
 const DEAPI_KEY = process.env.DEAPI_KEY || '';
 
-if (!DEAPI_BACKEND_URL || DEAPI_BACKEND_URL === 'YOUR_DEAPI_ENDPOINT_URL_HERE') {
+if (!DEAPI_BACKEND_URL || DEAPI_BACKEND_URL === '287|3JMRYgtTrUuaPH0skM69mbXE4Reg2DhhfWTD49LK518314a1') {
   console.error('⚠️ ERRO: A variável DEAPI_BACKEND_URL não está configurada. Defina-a no Railway (Settings -> Variables).');
 }
 if (!DEAPI_KEY) {
