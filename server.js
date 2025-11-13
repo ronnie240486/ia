@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Coloque aqui sua API KEY do deAPI.ai
-const DEAPI_KEY = process.env.DEAPI_KEY || 'COLOQUE_SUA_CHAVE_AQUI';
+const DEAPI_KEY = process.env.DEAPI_KEY || '258|m1Hba5ANE1SX6Uug9KBImWcvmC73fiSNnIPpVhPe9296508b';
 const DEAPI_URL = 'https://api.deapi.ai/v1/image';
 
 // --- MIDDLEWARES ---
