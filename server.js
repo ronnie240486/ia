@@ -65,7 +65,22 @@ app.post("/generate-image", async (req, res) => {
   }
 });
 
+// --- ENDPOINT PRINCIPAL ---
+app.post('/generate-image', async (req, res) => {
+  // ... seu código de geração de imagem aqui ...
+});
+
+// --- ROTA PRINCIPAL (teste) ---
+app.get('/', (req, res) => {
+  res.json({
+    status: '✅ Servidor ativo!',
+    message: 'Use POST /generate-image para gerar imagens com Pollinations ou DeAPI.ai.',
+    endpoints: ['/generate-image'],
+  });
+});
+
 // --- INICIALIZA SERVIDOR ---
 app.listen(PORT, () => {
   console.log(`✅ Servidor rodando na porta ${PORT}`);
 });
+
