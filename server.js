@@ -1,6 +1,6 @@
 // --- CONFIGURAÇÃO E IMPORTS ---
 const express = require('express');
-// body-parser está incluído no express moderno
+// const bodyParser = require('body-parser'); // Removido! Usar express.json()
 const fetch = require('node-fetch'); // Necessário para a API Pollinations.ai
 const cors = require('cors');
 
@@ -18,7 +18,7 @@ app.use(cors({
     methods: ['POST'],
     allowedHeaders: ['Content-Type']
 }));
-app.use(express.json()); // O substituto moderno para o body-parser
+app.use(express.json()); // O substituto moderno para o body-parser (CORRIGE O CRASH 404)
 
 /**
  * Endpoint Principal: /generate-image
