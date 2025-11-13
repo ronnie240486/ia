@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // LEIA A URL DO BACKEND DA DEAPI E A CHAVE AQUI (defina no Railway como variáveis de ambiente)
 const DEAPI_BACKEND_URL = process.env.DEAPI_BACKEND_URL || 'YOUR_DEAPI_ENDPOINT_URL_HERE';
