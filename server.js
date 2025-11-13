@@ -1,17 +1,12 @@
 // --- CONFIGURAÇÃO E IMPORTS ---
 const express = require('express');
 const cors = require('cors');
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🔑 sua chave deve estar em variável de ambiente
-const DEAPI_TOKEN = process.env.DEAPI_TOKEN;
-
-if (!DEAPI_TOKEN) {
-  console.error('⚠️ ERRO: A variável DEAPI_TOKEN não está configurada no Railway.');
-}
-
+// --- MIDDLEWARES ---
 app.use(cors({
   origin: '*',
   methods: ['POST'],
@@ -27,53 +22,36 @@ app.post('/generate-image', async (req, res) => {
     return res.status(400).json({ error: 'O prompt é obrigatório.' });
   }
 
-  // Função para gerar uma imagem via deAPI
+  // --- Função auxiliar para gerar URL via deAPI.ai ---
   const gerarImagem = async (seed) => {
-    try {
-      const response = await fetch("https://api.deapi.ai/api/v1/client/api/text-to-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Authorization": `Bearer ${DEAPI_TOKEN}`
-        },
-        body: JSON.stringify({
-          prompt,
-          model: "Flux1schnell", // ou outro modelo suportado
-          steps: "4",
-          width,
-          height,
-          seed
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro da deAPI: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Ajuste conforme formato real da resposta da deAPI
-      if (!data.image_url && !data.url && !data.output) {
-        console.error("Resposta inesperada:", data);
-        throw new Error("A resposta da deAPI não contém um URL de imagem válido.");
-      }
-
-      const imageUrl = data.image_url || data.url || data.output;
-      console.log(`[BACKEND] Imagem gerada: ${imageUrl}`);
-      return { imageUrl, seed };
-
-    } catch (err) {
-      console.error("Erro ao gerar imagem:", err);
-      throw err;
-    }
+    // URL do deAPI.ai (sem necessidade de chamada assíncrona)
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&width=${width}&height=${height}`;
+    return { imageUrl, seed };
   };
 
   try {
-    const total = Math.min(Number(quantidade), 5); // evitar sobrecarga
+    const total = Math.min(quantidade, 10); // Evita sobrecarga
     const seeds = Array.from({ length: total }, () => Math.floor(Math.random() * 1000000));
     const imagens = [];
 
-    for (const seed of seeds) {
-      const img = await gerarImagem(seed);
-      imag
+    const loteSize = 3; // Gera em pequenos lotes
+    for (let i = 0; i < seeds.length; i += loteSize) {
+      const lote = seeds.slice(i, i + loteSize);
+      const resultados = await Promise.allSettled(lote.map(gerarImagem));
+      resultados.forEach(r => {
+        if (r.status === 'fulfilled') imagens.push(r.value);
+      });
+      await new Promise(r => setTimeout(r, 300)); // pequeno delay
+    }
+
+    res.json({ images: imagens });
+  } catch (error) {
+    console.error('Erro ao gerar imagens:', error);
+    res.status(500).json({ error: 'Erro ao gerar imagens.' });
+  }
+});
+
+// --- INICIALIZA SERVIDOR ---
+app.listen(PORT, () => {
+  console.log(`✅ Servidor rodando na porta ${PORT}`);
+});
