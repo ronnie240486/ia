@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 8080;
 
 // 🔗 Endpoints externos
 const DEAPI_URL = "https://api.deapi.ai/api/v1/client/txt2img";
-const POLLINATIONS_URL = "https://pollinations.ai/prompt"; // usado no modelo gratuito
+const POLLINATIONS_URL = "https://image.pollinations.ai/prompt";
 
 // =======================
 // Função: gerar imagem via DeAPI.ai (POST)
@@ -48,12 +48,23 @@ async function gerarImagemDeAPI(prompt) {
 
 
 // =======================
-// Função: gerar imagem via Pollinations
+// Função: gerar imagem via Pollinations.ai (GET)
 // =======================
-async function gerarImagemPollinations(prompt) {
-  // A Pollinations gera imagem via URL direta
-  return `${POLLINATIONS_URL}/${encodeURIComponent(prompt)}?width=512&height=512`;
+async function gerarImagemPollinations(prompt, options = {}) {
+  const { model = "flux", width = 1024, height = 1024, seed } = options;
+
+  // Monta a URL com os parâmetros
+  const params = new URLSearchParams({
+    model,
+    width,
+    height,
+  });
+  if (seed) params.append("seed", seed);
+
+  const url = `${POLLINATIONS_URL}/${encodeURIComponent(prompt)}?${params.toString()}`;
+  return url; // Retorna o link direto da imagem gerada
 }
+
 
 // =======================
 // Rota principal /generate-image
