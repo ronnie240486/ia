@@ -5,7 +5,13 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- MIDDLEWARES ---
+// 🔑 sua chave deve estar em variável de ambiente
+const DEAPI_TOKEN = process.env.DEAPI_TOKEN;
+
+if (!DEAPI_TOKEN) {
+  console.error('⚠️ ERRO: A variável DEAPI_TOKEN não está configurada no Railway.');
+}
+
 app.use(cors({
   origin: '*',
   methods: ['POST'],
@@ -21,45 +27,53 @@ app.post('/generate-image', async (req, res) => {
     return res.status(400).json({ error: 'O prompt é obrigatório.' });
   }
 
-  // Função para gerar um link de imagem
+  // Função para gerar uma imagem via deAPI
   const gerarImagem = async (seed) => {
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&width=${width}&height=${height}`;
-    console.log(`[BACKEND] Imagem gerada (Seed: ${seed}): ${prompt}`);
-    return { imageUrl: url, seed };
+    try {
+      const response = await fetch("https://api.deapi.ai/api/v1/client/api/text-to-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Authorization": `Bearer ${DEAPI_TOKEN}`
+        },
+        body: JSON.stringify({
+          prompt,
+          model: "Flux1schnell", // ou outro modelo suportado
+          steps: "4",
+          width,
+          height,
+          seed
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro da deAPI: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Ajuste conforme formato real da resposta da deAPI
+      if (!data.image_url && !data.url && !data.output) {
+        console.error("Resposta inesperada:", data);
+        throw new Error("A resposta da deAPI não contém um URL de imagem válido.");
+      }
+
+      const imageUrl = data.image_url || data.url || data.output;
+      console.log(`[BACKEND] Imagem gerada: ${imageUrl}`);
+      return { imageUrl, seed };
+
+    } catch (err) {
+      console.error("Erro ao gerar imagem:", err);
+      throw err;
+    }
   };
 
   try {
-    // Limite de 10 imagens por requisição
-    const total = Math.min(Number(quantidade), 10);
+    const total = Math.min(Number(quantidade), 5); // evitar sobrecarga
     const seeds = Array.from({ length: total }, () => Math.floor(Math.random() * 1000000));
     const imagens = [];
 
-    // Gera em lotes de 3 para evitar travamentos e lentidão
-    const loteSize = 3;
-    for (let i = 0; i < seeds.length; i += loteSize) {
-      const lote = seeds.slice(i, i + loteSize);
-      const resultados = await Promise.allSettled(lote.map(gerarImagem));
-      resultados.forEach(r => {
-        if (r.status === 'fulfilled') imagens.push(r.value);
-      });
-      // Delay curto entre os lotes (ajuda a evitar erro 429 da Pollinations)
-      await new Promise(r => setTimeout(r, 300));
-    }
-
-    // ✅ Compatibilidade com frontend antigo e novo
-    if (imagens.length === 1) {
-      return res.json({ imageUrl: imagens[0].imageUrl, seed: imagens[0].seed });
-    } else {
-      return res.json({ images: imagens });
-    }
-
-  } catch (error) {
-    console.error('Erro interno:', error);
-    res.status(500).json({ error: `Erro ao gerar imagem: ${error.message}` });
-  }
-});
-
-// --- INICIALIZA SERVIDOR ---
-app.listen(PORT, () => {
-  console.log(`Servidor de ponte (Endpoint /generate-image) rodando na porta ${PORT}`);
-});
+    for (const seed of seeds) {
+      const img = await gerarImagem(seed);
+      imag
