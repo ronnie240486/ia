@@ -6,39 +6,48 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // --- MIDDLEWARES ---
-app.use(cors({
-  origin: '*',
-  methods: ['POST'],
-  allowedHeaders: ['Content-Type']
-}));
+app.use(cors({ origin: '*', methods: ['POST'], allowedHeaders: ['Content-Type'] }));
 app.use(express.json());
 
 // --- ENDPOINT PRINCIPAL ---
 app.post('/generate-image', async (req, res) => {
-  const { prompt, width = 512, height = 512, seed } = req.body;
+  const { prompt, quantidade = 1, width = 512, height = 512 } = req.body;
 
   if (!prompt) {
     return res.status(400).json({ error: 'O prompt é obrigatório.' });
   }
 
-  // Gerar uma semente aleatória para variar as imagens
-  const finalSeed = seed || Math.floor(Math.random() * 1000000);
+  // Função para gerar o link da imagem
+  const gerarImagem = async (seed) => {
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&width=${width}&height=${height}`;
+    console.log(`[BACKEND] Imagem gerada (Seed: ${seed}): ${prompt}`);
+    return { imageUrl: url, seed };
+  };
 
   try {
-    // Novo formato da Pollinations — imagem via URL direta
-    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${finalSeed}&width=${width}&height=${height}`;
+    const total = Math.min(quantidade, 10); // evita sobrecarga
+    const seeds = Array.from({ length: total }, () => Math.floor(Math.random() * 1000000));
+    const imagens = [];
 
-    console.log(`[BACKEND] Imagem gerada (Seed: ${finalSeed}): ${prompt}`);
+    // processa em lotes de 3 para equilibrar performance e limite da API
+    const loteSize = 3;
+    for (let i = 0; i < seeds.length; i += loteSize) {
+      const lote = seeds.slice(i, i + loteSize);
+      const resultados = await Promise.allSettled(lote.map(gerarImagem));
+      resultados.forEach(r => {
+        if (r.status === 'fulfilled') imagens.push(r.value);
+      });
+      await new Promise(r => setTimeout(r, 300)); // delay entre os lotes
+    }
 
-    // Retorna o link direto da imagem
-    res.json({ imageUrl, seed: finalSeed });
+    res.json({ images: imagens });
   } catch (error) {
-    console.error('Erro interno:', error);
-    res.status(500).json({ error: `Erro ao gerar imagem: ${error.message}` });
+    console.error('Erro ao gerar imagens:', error);
+    res.status(500).json({ error: 'Erro ao gerar imagens.' });
   }
 });
 
 // --- INICIALIZA SERVIDOR ---
 app.listen(PORT, () => {
-  console.log(`Servidor de ponte (Endpoint /generate-image) rodando na porta ${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
