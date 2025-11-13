@@ -1,7 +1,6 @@
 // --- CONFIGURAÇÃO E IMPORTS ---
 const express = require('express');
 const cors = require('cors');
-const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,26 +21,24 @@ app.post('/generate-image', async (req, res) => {
     return res.status(400).json({ error: 'O prompt é obrigatório.' });
   }
 
-  // --- Função auxiliar para gerar URL via deAPI.ai ---
   const gerarImagem = async (seed) => {
-    // URL do deAPI.ai (sem necessidade de chamada assíncrona)
     const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?seed=${seed}&width=${width}&height=${height}`;
     return { imageUrl, seed };
   };
 
   try {
-    const total = Math.min(quantidade, 10); // Evita sobrecarga
+    const total = Math.min(quantidade, 10);
     const seeds = Array.from({ length: total }, () => Math.floor(Math.random() * 1000000));
     const imagens = [];
 
-    const loteSize = 3; // Gera em pequenos lotes
+    const loteSize = 3;
     for (let i = 0; i < seeds.length; i += loteSize) {
       const lote = seeds.slice(i, i + loteSize);
       const resultados = await Promise.allSettled(lote.map(gerarImagem));
       resultados.forEach(r => {
         if (r.status === 'fulfilled') imagens.push(r.value);
       });
-      await new Promise(r => setTimeout(r, 300)); // pequeno delay
+      await new Promise(r => setTimeout(r, 300));
     }
 
     res.json({ images: imagens });
