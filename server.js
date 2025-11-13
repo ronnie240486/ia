@@ -1,11 +1,11 @@
 // --- CONFIGURAÇÃO E IMPORTS ---
 const express = require('express');
-const bodyParser = require('body-parser'); // Necessário para a API Pollinations.ai (mas cuidado com as versões)
-const fetch = require('node-fetch'); 
+// body-parser está incluído no express moderno
+const fetch = require('node-fetch'); // Necessário para a API Pollinations.ai
 const cors = require('cors');
 
 const app = express();
-// O Railway irá fornecer a porta via variável de ambiente (process.env.PORT)
+// O Railway/Vercel/Runway fornece a porta via process.env.PORT
 const PORT = process.env.PORT || 3000;
 
 // Configuração de API Externa
@@ -13,27 +13,21 @@ const POLLINATIONS_URL = 'https://pollinations.ai/api/v1/generate';
 const DEFAULT_MODEL = 'stable-diffusion-v1-5';
 
 // --- MIDDLEWARES ---
-
-// O CORS é FUNDAMENTAL. Ele permite que o seu domínio CronoScript (frontend) 
-// chame este servidor de backend. 
-// Substitua '*' pelo URL exato do seu frontend em produção se necessário.
 app.use(cors({ 
-    origin: '*', 
+    origin: '*', // Em produção, mude isto para o URL do seu CronoScript
     methods: ['POST'],
     allowedHeaders: ['Content-Type']
 }));
-// Usando bodyParser para analisar payloads JSON (corpo da requisição)
-app.use(bodyParser.json());
+app.use(express.json()); // O substituto moderno para o body-parser
 
 /**
  * Endpoint Principal: /generate-image
  * Recebe o prompt do CronoScript (frontend) e o envia para Pollinations.ai
  */
 app.post('/generate-image', async (req, res) => {
-    // Note: O frontend envia a semente aleatória dentro do payload se for um bulk. 
-    // Se não enviar, geramos uma nova semente aqui.
     const { prompt, width = 512, height = 512, seed } = req.body;
     
+    // **A CORREÇÃO PARA IMAGENS DIFERENTES**
     // Gerar uma semente aleatória se não for fornecida (para garantir imagens diferentes)
     const finalSeed = seed || Math.floor(Math.random() * 1000000);
 
