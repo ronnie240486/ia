@@ -1,103 +1,92 @@
-const express = require("express");
-const cors = require("cors");
-const fetch = require("node-fetch");
+import express from "express";
+import fetch from "node-fetch";
+import cors from "cors";
 
 const app = express();
-app.use(cors());
 app.use(express.json());
+app.use(cors());
 
 const PORT = process.env.PORT || 8080;
 
-// 🔗 Endpoints externos
-const DEAPI_URL = "https://api.deapi.ai/api/v1/client/txt2img";
-const POLLINATIONS_URL = "https://image.pollinations.ai/prompt";
+// === CONFIGURAÇÕES DE ENDPOINTS ===
+const POLLINATIONS_BACKEND_URL = "https://image.pollinations.ai/prompt/";
+const DEAPI_BACKEND_URL = process.env.DEAPI_BACKEND_URL || "https://api.deapi.ai/api/v1/client/txt2img";
+const DEAPI_API_KEY = process.env.DEAPI_API_KEY; // Defina no Railway como variável de ambiente
 
-// =======================
-// Função: gerar imagem via DeAPI.ai (POST)
-// =======================
+// === Função para gerar imagem via Pollinations ===
+async function gerarImagemPollinations(prompt) {
+  const url = `${POLLINATIONS_BACKEND_URL}${encodeURIComponent(prompt)}`;
+  console.log(`[POLLINATIONS] Requisitando: ${url}`);
+  return url; // Pollinations retorna imagem direta via GET
+}
+
+// === Função para gerar imagem via deapi.ai ===
 async function gerarImagemDeAPI(prompt) {
-  try {
-    const response = await fetch("https://api.deapi.ai/api/v1/client/txt2img", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.DEAPI_API_KEY}`, // ✅ agora com autenticação
-      },
-      body: JSON.stringify({
-        prompt,
-        aspect_ratio: "1:1",
-        model: "flux", // modelo gratuito ou padrão
-      }),
-    });
+  console.log(`[DEAPI] Chamando ${DEAPI_BACKEND_URL} com prompt: ${prompt}`);
 
-    if (!response.ok) {
-      const erro = await response.text();
-      console.error("[DEAPI] Erro:", erro);
-      throw new Error(`DEAPI retornou ${response.status}`);
-    }
-
-    const data = await response.json();
-
-    if (data.image_url) return data.image_url;
-    else throw new Error("URL de imagem não encontrada na resposta da DeAPI.");
-  } catch (err) {
-    console.error("Erro ao chamar DeAPI:", err.message);
-    throw err;
-  }
-}
-
-
-// =======================
-// Função: gerar imagem via Pollinations.ai (GET)
-// =======================
-async function gerarImagemPollinations(prompt, options = {}) {
-  const { model = "flux", width = 1024, height = 1024, seed } = options;
-
-  // Monta a URL com os parâmetros
-  const params = new URLSearchParams({
-    model,
-    width,
-    height,
+  const response = await fetch(DEAPI_BACKEND_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${DEAPI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      prompt,
+      negative_prompt: "",
+      width: 1024,
+      height: 1024,
+      steps: 25,
+      cfg_scale: 7,
+      sampler: "Euler a",
+    }),
   });
-  if (seed) params.append("seed", seed);
 
-  const url = `${POLLINATIONS_URL}/${encodeURIComponent(prompt)}?${params.toString()}`;
-  return url; // Retorna o link direto da imagem gerada
+  const text = await response.text();
+  if (!response.ok) {
+    console.error(`[DEAPI] erro ${response.status}: ${text}`);
+    throw new Error(`DEAPI retornou ${response.status}: ${text}`);
+  }
+
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(`Resposta inválida da DEAPI: ${text}`);
+  }
+
+  // Possíveis formatos de retorno
+  const imageUrl = data.image_url || data.url || data.output?.[0];
+  if (!imageUrl) throw new Error(`Não foi possível localizar a URL da imagem. Resposta: ${JSON.stringify(data)}`);
+
+  return imageUrl;
 }
 
-
-// =======================
-// Rota principal /generate-image
-// =======================
+// === Endpoint principal ===
 app.post("/generate-image", async (req, res) => {
   const { prompt, model } = req.body;
 
-  if (!prompt) return res.status(400).json({ error: "Prompt é obrigatório." });
+  if (!prompt) {
+    return res.status(400).json({ error: "O campo 'prompt' é obrigatório." });
+  }
 
   try {
     let imageUrl;
 
-    if (model === "deapi") {
+    if (model === "pollinations") {
+      imageUrl = await gerarImagemPollinations(prompt);
+    } else if (model === "deapi") {
       imageUrl = await gerarImagemDeAPI(prompt);
     } else {
-      imageUrl = await gerarImagemPollinations(prompt);
+      return res.status(400).json({ error: "Modelo inválido ou não suportado." });
     }
 
-    res.json({ imageUrl });
-  } catch (error) {
-    console.error("Erro ao gerar imagem:", error);
-    res.status(500).json({ error: "Falha ao gerar imagem", details: error.message });
+    return res.json({ success: true, imageUrl });
+  } catch (err) {
+    console.error("Erro ao gerar imagem:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// =======================
-// Teste de rota raiz
-// =======================
-app.get("/", (req, res) => {
-  res.send("✅ Servidor de ponte ativo! Use POST /generate-image");
+app.listen(PORT, () => {
+  console.log(`✅ Servidor rodando na porta ${PORT}`);
 });
-
-// =======================
-// Inicializa o servidor
-// =======================
-app.listen(PORT, () => console.log(`🚀 Servidor rodando na porta ${PORT}`));
