@@ -13,20 +13,20 @@ const DEAPI_URL = "https://api.deapi.ai/api/v1/client/txt2img";
 const POLLINATIONS_URL = "https://pollinations.ai/prompt"; // usado no modelo gratuito
 
 // =======================
-// Função: gerar imagem via DeAPI
+// Função: gerar imagem via DeAPI.ai (POST)
 // =======================
 async function gerarImagemDeAPI(prompt) {
   try {
-    const response = await fetch(DEAPI_URL, {
+    const response = await fetch("https://api.deapi.ai/api/v1/client/txt2img", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.DEAPI_API_KEY}`, // ✅ agora com autenticação
       },
       body: JSON.stringify({
         prompt,
         aspect_ratio: "1:1",
-        negative_prompt: "",
-        model: "flux", // modelo padrão gratuito da DeAPI
+        model: "flux", // modelo gratuito ou padrão
       }),
     });
 
@@ -38,7 +38,6 @@ async function gerarImagemDeAPI(prompt) {
 
     const data = await response.json();
 
-    // DeAPI geralmente retorna { image_url: "https://..." }
     if (data.image_url) return data.image_url;
     else throw new Error("URL de imagem não encontrada na resposta da DeAPI.");
   } catch (err) {
@@ -46,6 +45,7 @@ async function gerarImagemDeAPI(prompt) {
     throw err;
   }
 }
+
 
 // =======================
 // Função: gerar imagem via Pollinations
