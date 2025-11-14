@@ -12,9 +12,10 @@ const POLLINATIONS_BACKEND_URL = "https://image.pollinations.ai/prompt/";
 const DEAPI_BACKEND_URL = process.env.DEAPI_BACKEND_URL || "https://api.deapi.ai/api/v1/client/txt2img";
 const DEAPI_API_KEY = process.env.DEAPI_API_KEY;
 
-const cache = new Map(); // Cache simples em memória
+// Cache simples em memória
+const cache = new Map();
 
-// === Pollinations ===
+// ====== Função Pollinations ======
 function gerarImagemPollinations(prompt) {
   if (cache.has(`pollinations:${prompt}`)) return cache.get(`pollinations:${prompt}`);
   const url = `${POLLINATIONS_BACKEND_URL}${encodeURIComponent(prompt)}`;
@@ -22,7 +23,7 @@ function gerarImagemPollinations(prompt) {
   return url;
 }
 
-// === DEAPI com timeout curto ===
+// ====== Função DEAPI com timeout ======
 async function gerarImagemDeAPI(prompt) {
   if (!DEAPI_API_KEY) throw new Error("DEAPI_API_KEY não configurada.");
 
@@ -71,16 +72,24 @@ async function gerarImagemDeAPI(prompt) {
   return imageUrl;
 }
 
-// === Endpoint principal ===
+// ====== Endpoint principal ======
 app.post("/generate-image", async (req, res) => {
   const { prompt, model } = req.body;
   if (!prompt) return res.status(400).json({ error: "O campo 'prompt' é obrigatório." });
 
   try {
     let imageUrl;
-    if (model === "pollinations") imageUrl = gerarImagemPollinations(prompt);
-    else if (model === "deapi") imageUrl = await gerarImagemDeAPI(prompt);
-    else return res.status(400).json({ error: "Modelo inválido. Use 'pollinations' ou 'deapi'." });
+
+    if (model === "deapi") {
+      try {
+        imageUrl = await gerarImagemDeAPI(prompt);
+      } catch (err) {
+        console.error("[DEAPI] Falhou, tentando Pollinations como fallback:", err.message);
+        imageUrl = gerarImagemPollinations(prompt); // fallback
+      }
+    } else {
+      imageUrl = gerarImagemPollinations(prompt);
+    }
 
     res.json({ success: true, imageUrl });
   } catch (err) {
@@ -89,7 +98,7 @@ app.post("/generate-image", async (req, res) => {
   }
 });
 
-// === Start do servidor ===
+// ====== Start do servidor ======
 app.listen(PORT, () => {
   console.log(`✅ Servidor rodando na porta ${PORT}`);
   console.log(`DEAPI_API_KEY: ${DEAPI_API_KEY ? "OK" : "MISSING"}`);
