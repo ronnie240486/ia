@@ -72,15 +72,30 @@ async function sdProxy(prompt) {
         body: form
     });
 
-    const data = await response.json();
-    console.log("Erro SD:", data);
+    // 👇 LOG BRUTO PARA DEBUGAR
+    const raw = await response.text();
+    console.log("SD RAW RESPONSE:", raw);
 
+    let data;
+    try {
+        data = JSON.parse(raw);
+    } catch (e) {
+        throw new Error("StableDiffusion retornou HTML — API KEY inválida ou servidor em erro.");
+    }
+
+    // 👇 Verifica erros retornados pelo SD
     if (data?.errors) {
-        throw new Error("Erro no Stable Diffusion Proxy");
+        console.log("Erro SD:", data);
+        throw new Error(data.errors.join(", "));
+    }
+
+    if (!data.output || !data.output[0]) {
+        throw new Error("StableDiffusion não retornou imagem");
     }
 
     return data.output[0];
 }
+
 
 // ============================================================
 // ENDPOINT PRINCIPAL
