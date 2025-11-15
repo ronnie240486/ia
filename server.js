@@ -1,162 +1,123 @@
-import "dotenv/config";
 import express from "express";
-import fetch from "node-fetch";
 import cors from "cors";
+import fetch from "node-fetch";
 
 const app = express();
-
-// ===================== CORS FULL =====================
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "x-api-key", "apikey"],
-  })
-);
-
-app.options("*", cors());
-
 app.use(express.json());
+app.use(cors({ origin: "*" }));
 
-// ===================== CONFIG =====================
 const PORT = process.env.PORT || 8080;
-const POLLINATIONS_BACKEND_URL = "https://image.pollinations.ai/prompt/";
-const DEAPI_BACKEND_URL =
-  process.env.DEAPI_BACKEND_URL ||
-  "https://api.deapi.ai/api/v1/client/txt2img";
-const DEAPI_API_KEY = process.env.DEAPI_API_KEY;
 
-// Cache simples
-const cache = new Map();
-
-// ===================== POLLINATIONS =====================
-function gerarImagemPollinations(prompt) {
-  const cacheKey = `pollinations:${prompt}`;
-  if (cache.has(cacheKey)) return cache.get(cacheKey);
-
-  const url = `${POLLINATIONS_BACKEND_URL}${encodeURIComponent(prompt)}`;
-  cache.set(cacheKey, url);
-  return url;
+// -----------------------------
+// 1) POLLINATIONS (GRÁTIS ILIMITADO)
+// -----------------------------
+function pollinations(prompt) {
+    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
 }
 
-// ===================== DEAPI (4 formas de autenticação) =====================
+// -----------------------------
+// 2) HUGGINGFACE FLUX (FREE PUBLIC ENDPOINT)
+// -----------------------------
+async function huggingfaceFlux(prompt) {
+    const response = await fetch(
+        "https://hf.space/embed/black-forest-labs/FLUX.1-schnell/+/api/predict/",
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                data: [prompt]
+            })
+        }
+    );
 
-async function tentarDEAPI(prompt, headers) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-
-  try {
-    const response = await fetch(DEAPI_BACKEND_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        prompt,
-        negative_prompt: "",
-        width: 1024,
-        height: 1024,
-        steps: 25,
-        cfg_scale: 7,
-        sampler: "Euler a",
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const txt = await response.text();
-      throw new Error(`DEAPI retornou ${response.status}: ${txt}`);
-    }
-
-    const data = await response.json();
-    const url = data.image_url || data.url || (data.output && data.output[0]);
-    if (!url) throw new Error("Resposta inválida da DEAPI");
-
-    return url;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function gerarImagemDeAPI(prompt) {
-  if (!DEAPI_API_KEY) throw new Error("DEAPI_API_KEY não configurada.");
-
-  const cacheKey = `deapi:${prompt}`;
-  if (cache.has(cacheKey)) return cache.get(cacheKey);
-
-  const tentativas = [
-    // Tentativa 1 — Bearer (mais comum)
-    {
-      nome: "Authorization: Bearer",
-      header: { Authorization: `Bearer ${DEAPI_API_KEY}`, "Content-Type": "application/json", Accept: "application/json" }
-    },
-    // Tentativa 2 — Authorization simples
-    {
-      nome: "Authorization simples",
-      header: { Authorization: DEAPI_API_KEY, "Content-Type": "application/json", Accept: "application/json" }
-    },
-    // Tentativa 3 — x-api-key
-    {
-      nome: "x-api-key",
-      header: { "x-api-key": DEAPI_API_KEY, "Content-Type": "application/json", Accept: "application/json" }
-    },
-    // Tentativa 4 — apikey
-    {
-      nome: "apikey",
-      header: { apikey: DEAPI_API_KEY, "Content-Type": "application/json", Accept: "application/json" }
-    }
-  ];
-
-  for (const t of tentativas) {
+    const json = await response.json();
     try {
-      console.log(`[DEAPI] Testando método: ${t.nome}`);
-      const url = await tentarDEAPI(prompt, t.header);
-      console.log(`[DEAPI] Sucesso com método: ${t.nome}`);
-      cache.set(cacheKey, url);
-      return url;
-    } catch (e) {
-      console.log(`[DEAPI] Falhou com ${t.nome}: ${e.message}`);
+        return json.data[0].url;
+    } catch {
+        throw new Error("Flux HF sem resposta.");
     }
-  }
-
-  throw new Error("Nenhum método de autenticação funcionou.");
 }
 
-// ===================== ENDPOINT =====================
+// -----------------------------
+// 3) STABLE DIFFUSION GRÁTIS VIA PROXY
+// -----------------------------
+async function sdProxy(prompt) {
+    const response = await fetch(
+        "https://api-inference.huggingface.co/models/CompVis/stable-diffusion-v1-4",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+                // sem api key → usa quota pública gratuita
+            },
+            body: JSON.stringify({ inputs: prompt })
+        }
+    );
+
+    const blob = await response.blob();
+    const buffer = await blob.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+
+    return `data:image/png;base64,${base64}`;
+}
+
+// -----------------------------
+// 4) FALLBACK UNIVERSAL (SE NADA DER CERTO)
+// -----------------------------
+function fallback(prompt) {
+    return pollinations(prompt);
+}
+
+// -----------------------------
+// ENDPOINT PRINCIPAL
+// -----------------------------
 app.post("/generate-image", async (req, res) => {
-  const { prompt, model } = req.body;
+    const { prompt } = req.body;
 
-  if (!prompt) {
-    return res
-      .status(400)
-      .json({ error: "O campo 'prompt' é obrigatório." });
-  }
-
-  try {
-    let imageUrl;
-
-    if (model === "deapi") {
-      try {
-        imageUrl = await gerarImagemDeAPI(prompt);
-      } catch (err) {
-        console.log("[DEAPI] Todas tentativas falharam, usando Pollinations.");
-        imageUrl = gerarImagemPollinations(prompt);
-      }
-    } else {
-      imageUrl = gerarImagemPollinations(prompt);
+    if (!prompt) {
+        return res.status(400).json({ error: "prompt é obrigatório" });
     }
 
-    res.json({ success: true, imageUrl });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+    // Tentativa 1 → Pollinations direto (rápida)
+    try {
+        return res.json({
+            provider: "pollinations",
+            imageUrl: pollinations(prompt)
+        });
+    } catch {}
+
+    // Tentativa 2 → FLUX (HuggingFace)
+    try {
+        const url = await huggingfaceFlux(prompt);
+        return res.json({
+            provider: "huggingface-flux",
+            imageUrl: url
+        });
+    } catch {}
+
+    // Tentativa 3 → Stable Diffusion (HF Proxy)
+    try {
+        const url = await sdProxy(prompt);
+        return res.json({
+            provider: "stable-diffusion-proxy",
+            imageUrl: url
+        });
+    } catch {}
+
+    // Tentativa 4 → fallback universal
+    return res.json({
+        provider: "fallback",
+        imageUrl: fallback(prompt)
+    });
 });
 
-// ===================== ROTA TESTE =====================
+// -----------------------------
+// ROTA DE STATUS
+// -----------------------------
 app.get("/", (req, res) => {
-  res.send("Backend online 🚀");
+    res.send("🔥 Backend de imagens grátis funcionando!");
 });
 
-// ===================== START =====================
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`DEAPI_API_KEY: ${DEAPI_API_KEY ? "OK" : "MISSING"}`);
+    console.log(`🚀 Servidor online na porta ${PORT}`);
 });
