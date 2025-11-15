@@ -1,10 +1,13 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
+import FormData from "form-data";
+import { fetch as undiciFetch } from "undici";
 
 const app = express();
 app.use(express.json());
 
+// CORS universal
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
@@ -48,14 +51,11 @@ async function huggingfaceFlux(prompt) {
         throw new Error("Erro no HuggingFace Flux");
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    return `data:image/png;base64,${base64}`;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    return `data:image/png;base64,${buffer.toString("base64")}`;
 }
 
-// ---------- STABLE DIFFUSION PROXY (AGORA 100% CORRETO) ----------
-import FormData from "form-data";
-
+// ---------- STABLE DIFFUSION (STABILITY AI OFICIAL) ----------
 async function sdProxy(prompt) {
     const key = process.env.SD_API_KEY;
 
@@ -67,13 +67,13 @@ async function sdProxy(prompt) {
     form.append("prompt", prompt);
     form.append("output_format", "webp");
 
-    const response = await fetch(
+    const response = await undiciFetch(
         "https://api.stability.ai/v2beta/stable-image/generate/core",
         {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${key}`,
-                ...form.getHeaders()
+                ...form.getHeaders() // *** IMPORTANTE ***
             },
             body: form
         }
@@ -88,11 +88,6 @@ async function sdProxy(prompt) {
 
     return `data:image/webp;base64,${data.image}`;
 }
-
-    // A API retorna a imagem em Base64
-    return `data:image/webp;base64,${data.image}`;
-}
-
 
 // ============================================================
 // ENDPOINT PRINCIPAL
@@ -135,11 +130,18 @@ app.post("/generate-image", async (req, res) => {
 });
 
 // ============================================================
+// ROTA TESTE
+// ============================================================
 app.get("/", (req, res) => {
     res.send("Backend online 🚀");
 });
-// ============================================================
 
+// ============================================================
+// START SERVER
+// ============================================================
 app.listen(PORT, () => {
     console.log(`Servidor iniciado na porta ${PORT}`);
+    console.log("POLLINATIONS: OK (sempre funciona)");
+    console.log("HF_TOKEN:", process.env.HF_TOKEN ? "OK" : "MISSING");
+    console.log("SD_API_KEY:", process.env.SD_API_KEY ? "OK" : "MISSING");
 });
