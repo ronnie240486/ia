@@ -63,3 +63,4 @@ app.post("/generate-image", async (req, res) => {
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public/index.html")));
 
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+ 
