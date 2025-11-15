@@ -8,116 +8,125 @@ app.use(cors({ origin: "*" }));
 
 const PORT = process.env.PORT || 8080;
 
-// -----------------------------
-// 1) POLLINATIONS (GRÁTIS ILIMITADO)
-// -----------------------------
+// ------------------------------------------------------------
+// MODEL 1 — POLLINATIONS (FREE, INSTANT, UNLIMITED)
+// ------------------------------------------------------------
 function pollinations(prompt) {
     return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
 }
 
-// -----------------------------
-// 2) HUGGINGFACE FLUX (FREE PUBLIC ENDPOINT)
-// -----------------------------
-async function huggingfaceFlux(prompt) {
+// ------------------------------------------------------------
+// MODEL 2 — FLUX (HuggingFace Public Space - FREE)
+// ------------------------------------------------------------
+async function flux(prompt) {
     const response = await fetch(
         "https://hf.space/embed/black-forest-labs/FLUX.1-schnell/+/api/predict/",
         {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                data: [prompt]
-            })
+            body: JSON.stringify({ data: [prompt] })
         }
     );
 
     const json = await response.json();
-    try {
-        return json.data[0].url;
-    } catch {
-        throw new Error("Flux HF sem resposta.");
+
+    if (!json?.data?.[0]?.url) {
+        throw new Error("Flux não retornou imagem.");
     }
+
+    return json.data[0].url;
 }
 
-// -----------------------------
-// 3) STABLE DIFFUSION GRÁTIS VIA PROXY
-// -----------------------------
-async function sdProxy(prompt) {
+// ------------------------------------------------------------
+// MODEL 3 — STABLE DIFFUSION GRÁTIS VIA PROXY HF
+// ------------------------------------------------------------
+async function stableDiffusion(prompt) {
     const response = await fetch(
         "https://api-inference.huggingface.co/models/CompVis/stable-diffusion-v1-4",
         {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
-                // sem api key → usa quota pública gratuita
+                // Sem chave → usa proxy público gratuito
             },
             body: JSON.stringify({ inputs: prompt })
         }
     );
 
     const blob = await response.blob();
-    const buffer = await blob.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString("base64");
+    const arrayBuffer = await blob.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
 
     return `data:image/png;base64,${base64}`;
 }
 
-// -----------------------------
-// 4) FALLBACK UNIVERSAL (SE NADA DER CERTO)
-// -----------------------------
-function fallback(prompt) {
-    return pollinations(prompt);
+// ------------------------------------------------------------
+// AUTO MODE — TENTA TODOS EM ORDEM
+// ------------------------------------------------------------
+async function autoMode(prompt) {
+    try { return { provider: "pollinations", url: pollinations(prompt) }; }
+    catch {}
+
+    try { return { provider: "flux", url: await flux(prompt) }; }
+    catch {}
+
+    try { return { provider: "stable-diffusion", url: await stableDiffusion(prompt) }; }
+    catch {}
+
+    return { provider: "fallback", url: pollinations(prompt) };
 }
 
-// -----------------------------
+// ------------------------------------------------------------
 // ENDPOINT PRINCIPAL
-// -----------------------------
+// ------------------------------------------------------------
 app.post("/generate-image", async (req, res) => {
-    const { prompt } = req.body;
+    const { prompt, model = "auto" } = req.body;
 
     if (!prompt) {
         return res.status(400).json({ error: "prompt é obrigatório" });
     }
 
-    // Tentativa 1 → Pollinations direto (rápida)
     try {
-        return res.json({
-            provider: "pollinations",
-            imageUrl: pollinations(prompt)
-        });
-    } catch {}
+        let imageUrl, provider;
 
-    // Tentativa 2 → FLUX (HuggingFace)
-    try {
-        const url = await huggingfaceFlux(prompt);
-        return res.json({
-            provider: "huggingface-flux",
-            imageUrl: url
-        });
-    } catch {}
+        switch (model) {
+            case "pollinations":
+                provider = "pollinations";
+                imageUrl = pollinations(prompt);
+                break;
 
-    // Tentativa 3 → Stable Diffusion (HF Proxy)
-    try {
-        const url = await sdProxy(prompt);
-        return res.json({
-            provider: "stable-diffusion-proxy",
-            imageUrl: url
-        });
-    } catch {}
+            case "flux":
+                provider = "flux";
+                imageUrl = await flux(prompt);
+                break;
 
-    // Tentativa 4 → fallback universal
-    return res.json({
-        provider: "fallback",
-        imageUrl: fallback(prompt)
-    });
+            case "sd":
+            case "stable-diffusion":
+                provider = "stable-diffusion";
+                imageUrl = await stableDiffusion(prompt);
+                break;
+
+            default:
+                const autoResult = await autoMode(prompt);
+                provider = autoResult.provider;
+                imageUrl = autoResult.url;
+        }
+
+        return res.json({ success: true, provider, imageUrl });
+
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            error: err.message,
+        });
+    }
 });
 
-// -----------------------------
-// ROTA DE STATUS
-// -----------------------------
+// ------------------------------------------------------------
+// STATUS ROUTE
+// ------------------------------------------------------------
 app.get("/", (req, res) => {
-    res.send("🔥 Backend de imagens grátis funcionando!");
+    res.send("🔥 Multi-model Image API (Free) Online!");
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor online na porta ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server online na porta ${PORT}`));
