@@ -3,79 +3,89 @@ import cors from "cors";
 
 const app = express();
 app.use(express.json());
-
 app.use(cors({ origin: "*", methods: ["GET", "POST"] }));
 
 const PORT = process.env.PORT || 8080;
 
 // =============================================================
-// PROVIDERS ★ MODELOS 100% GRATUITOS E LOCAIS / VERSÁTEIS
+// PROVIDERS ★ MODELOS 100% GRATUITOS E LOCAIS / PLACEHOLDER
+// =============================================================
+
+// =============================================================
+// Funções Pollinations e Picsum (placeholder)
 // =============================================================
 
 // 1 — Pollinations
 function pollinations(prompt) {
-    return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
+    // TODO: Integrar lógica real de geração de imagem local ou via SD
+    return `pollinations://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 2 — Pollinations v2
+// 2 — Pollinations V2
 function pollinationsV2(prompt) {
-    return `https://pollinations.ai/p/${encodeURIComponent(prompt)}`;
+    // TODO: Integrar lógica real de geração de imagem local ou via SDXL
+    return `pollinations-v2://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
 // 3 — Picsum Photos
 function picsum() {
+    // Picsum não gera a partir de prompt, apenas retorna imagem aleatória
     const size = Math.floor(Math.random() * 500) + 300;
     return `https://picsum.photos/${size}`;
 }
 
-// 4 — Stable Diffusion v1.5 (placeholder)
+// =============================================================
+// Modelos locais placeholders
+// =============================================================
+
 function stableDiffusionV1_5(prompt) {
-    return `stable-diffusion-v1.5://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar Stable Diffusion v1.5 local
+    return `stable-diffusion-v1.5://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 5 — Stable Diffusion XL (SDXL) (placeholder)
 function stableDiffusionXL(prompt) {
-    return `stable-diffusion-xl://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar Stable Diffusion XL local
+    return `stable-diffusion-xl://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 6 — Dreamlike Photoreal 1.0 (placeholder)
 function dreamlike1(prompt) {
-    return `dreamlike-photoreal-1://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar Dreamlike Photoreal 1.0 local
+    return `dreamlike-1://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 7 — Dreamlike Photoreal 2.0 (placeholder)
 function dreamlike2(prompt) {
-    return `dreamlike-photoreal-2://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar Dreamlike Photoreal 2.0 local
+    return `dreamlike-2://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 8 — Anything v5 / 5.1 (placeholder)
 function anythingV5(prompt) {
-    return `anything-v5://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar Anything v5 local
+    return `anything-v5://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 9 — DeepFloyd IF (placeholder)
 function deepFloydIF(prompt) {
-    return `deepfloyd-if://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar DeepFloyd IF local
+    return `deepfloyd-if://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 10 — Waifu Diffusion (modo livre, placeholder)
 function waifuDiffusion(prompt) {
-    return `waifu-diffusion://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar Waifu Diffusion modo livre local
+    return `waifu-diffusion://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 11 — Stable Horde + SD local (placeholder)
 function stableHorde(prompt) {
-    return `stable-horde://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar Stable Horde local
+    return `stable-horde://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 12 — BoxDiff (placeholder)
 function boxDiff(prompt) {
-    return `boxdiff://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar BoxDiff local
+    return `boxdiff://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 13 — ComfyUI (placeholder)
 function comfyUI(prompt) {
-    return `comfyui://generate?prompt=${encodeURIComponent(prompt)}`;
+    // TODO: Integrar ComfyUI local
+    return `comfyui://placeholder?prompt=${encodeURIComponent(prompt)}`;
 }
 
 // =============================================================
@@ -108,6 +118,7 @@ app.post("/generate-image", (req, res) => {
                 return res.status(400).json({ error: "Modelo desconhecido" });
         }
 
+        // Retorna o placeholder para integração futura
         return res.json({ success: true, model, imageUrl });
     } catch (err) {
         console.error("Erro:", err.message);
@@ -120,7 +131,7 @@ app.post("/generate-image", (req, res) => {
 // =============================================================
 
 app.get("/", (req, res) => {
-    res.send("🚀 Backend MODELOS 100% FREE ONLINE (Pollinations + Picsum + 10 modelos locais)");
+    res.send("🚀 Backend MODELOS PLACEHOLDER (Pollinations + Picsum + 10 modelos locais)");
 });
 
 // =============================================================
