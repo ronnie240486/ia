@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import "dotenv/config";
 import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
@@ -6,20 +6,24 @@ import cors from "cors";
 const app = express();
 
 // ===================== CORS FULL =====================
-app.use(cors({
+app.use(
+  cors({
     origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-}));
+    allowedHeaders: ["Content-Type", "Authorization", "x-api-key", "apikey"],
+  })
+);
 
 app.options("*", cors());
 
 app.use(express.json());
 
-// ===================== CONSTANTES =====================
+// ===================== CONFIG =====================
 const PORT = process.env.PORT || 8080;
 const POLLINATIONS_BACKEND_URL = "https://image.pollinations.ai/prompt/";
-const DEAPI_BACKEND_URL = process.env.DEAPI_BACKEND_URL || "https://api.deapi.ai/api/v1/client/txt2img";
+const DEAPI_BACKEND_URL =
+  process.env.DEAPI_BACKEND_URL ||
+  "https://api.deapi.ai/api/v1/client/txt2img";
 const DEAPI_API_KEY = process.env.DEAPI_API_KEY;
 
 // Cache simples
@@ -27,103 +31,132 @@ const cache = new Map();
 
 // ===================== POLLINATIONS =====================
 function gerarImagemPollinations(prompt) {
-    const cacheKey = `pollinations:${prompt}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey);
+  const cacheKey = `pollinations:${prompt}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
 
-    const url = `${POLLINATIONS_BACKEND_URL}${encodeURIComponent(prompt)}`;
-    cache.set(cacheKey, url);
-    return url;
+  const url = `${POLLINATIONS_BACKEND_URL}${encodeURIComponent(prompt)}`;
+  cache.set(cacheKey, url);
+  return url;
 }
 
-// ===================== DEAPI =====================
-async function gerarImagemDeAPI(prompt) {
-    if (!DEAPI_API_KEY) throw new Error("DEAPI_API_KEY não configurada.");
+// ===================== DEAPI (4 formas de autenticação) =====================
 
-    const cacheKey = `deapi:${prompt}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey);
+async function tentarDEAPI(prompt, headers) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-
-    let response;
-
-    try {
-        response = await fetch(DEAPI_BACKEND_URL, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${DEAPI_API_KEY}`,
-                "Content-Type": "application/json",
-                Accept: "application/json",
-            },
-            body: JSON.stringify({
-                prompt,
-                negative_prompt: "",
-                width: 1024,
-                height: 1024,
-                steps: 25,
-                cfg_scale: 7,
-                sampler: "Euler a",
-            }),
-            signal: controller.signal,
-        });
-    } catch (err) {
-        if (err.name === "AbortError") throw new Error("DEAPI demorou e foi abortada.");
-        throw err;
-    } finally {
-        clearTimeout(timeout);
-    }
+  try {
+    const response = await fetch(DEAPI_BACKEND_URL, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        prompt,
+        negative_prompt: "",
+        width: 1024,
+        height: 1024,
+        steps: 25,
+        cfg_scale: 7,
+        sampler: "Euler a",
+      }),
+      signal: controller.signal,
+    });
 
     if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`DEAPI retornou ${response.status}: ${text}`);
+      const txt = await response.text();
+      throw new Error(`DEAPI retornou ${response.status}: ${txt}`);
     }
 
     const data = await response.json();
-    const imageUrl = data.image_url || data.url || (data.output && data.output[0]);
+    const url = data.image_url || data.url || (data.output && data.output[0]);
+    if (!url) throw new Error("Resposta inválida da DEAPI");
 
-    if (!imageUrl) throw new Error("Não foi possível obter URL da imagem.");
+    return url;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
-    cache.set(cacheKey, imageUrl);
-    return imageUrl;
+async function gerarImagemDeAPI(prompt) {
+  if (!DEAPI_API_KEY) throw new Error("DEAPI_API_KEY não configurada.");
+
+  const cacheKey = `deapi:${prompt}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey);
+
+  const tentativas = [
+    // Tentativa 1 — Bearer (mais comum)
+    {
+      nome: "Authorization: Bearer",
+      header: { Authorization: `Bearer ${DEAPI_API_KEY}`, "Content-Type": "application/json", Accept: "application/json" }
+    },
+    // Tentativa 2 — Authorization simples
+    {
+      nome: "Authorization simples",
+      header: { Authorization: DEAPI_API_KEY, "Content-Type": "application/json", Accept: "application/json" }
+    },
+    // Tentativa 3 — x-api-key
+    {
+      nome: "x-api-key",
+      header: { "x-api-key": DEAPI_API_KEY, "Content-Type": "application/json", Accept: "application/json" }
+    },
+    // Tentativa 4 — apikey
+    {
+      nome: "apikey",
+      header: { apikey: DEAPI_API_KEY, "Content-Type": "application/json", Accept: "application/json" }
+    }
+  ];
+
+  for (const t of tentativas) {
+    try {
+      console.log(`[DEAPI] Testando método: ${t.nome}`);
+      const url = await tentarDEAPI(prompt, t.header);
+      console.log(`[DEAPI] Sucesso com método: ${t.nome}`);
+      cache.set(cacheKey, url);
+      return url;
+    } catch (e) {
+      console.log(`[DEAPI] Falhou com ${t.nome}: ${e.message}`);
+    }
+  }
+
+  throw new Error("Nenhum método de autenticação funcionou.");
 }
 
 // ===================== ENDPOINT =====================
 app.post("/generate-image", async (req, res) => {
-    const { prompt, model } = req.body;
+  const { prompt, model } = req.body;
 
-    if (!prompt) {
-        return res.status(400).json({ error: "O campo 'prompt' é obrigatório." });
+  if (!prompt) {
+    return res
+      .status(400)
+      .json({ error: "O campo 'prompt' é obrigatório." });
+  }
+
+  try {
+    let imageUrl;
+
+    if (model === "deapi") {
+      try {
+        imageUrl = await gerarImagemDeAPI(prompt);
+      } catch (err) {
+        console.log("[DEAPI] Todas tentativas falharam, usando Pollinations.");
+        imageUrl = gerarImagemPollinations(prompt);
+      }
+    } else {
+      imageUrl = gerarImagemPollinations(prompt);
     }
 
-    try {
-        let imageUrl;
-
-        if (model === "deapi") {
-            try {
-                imageUrl = await gerarImagemDeAPI(prompt);
-            } catch (err) {
-                console.error("[DEAPI] Falhou, fallback:", err.message);
-                imageUrl = gerarImagemPollinations(prompt);
-            }
-        } else {
-            imageUrl = gerarImagemPollinations(prompt);
-        }
-
-        res.json({ success: true, imageUrl });
-
-    } catch (err) {
-        console.error("Erro ao gerar imagem:", err);
-        res.status(500).json({ error: err.message });
-    }
+    res.json({ success: true, imageUrl });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// ===================== ROTA INICIAL =====================
+// ===================== ROTA TESTE =====================
 app.get("/", (req, res) => {
-    res.send("Backend online 🚀");
+  res.send("Backend online 🚀");
 });
 
 // ===================== START =====================
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor rodando na porta ${PORT}`);
-    console.log(`DEAPI_API_KEY: ${DEAPI_API_KEY ? "OK" : "MISSING"}`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`DEAPI_API_KEY: ${DEAPI_API_KEY ? "OK" : "MISSING"}`);
 });
