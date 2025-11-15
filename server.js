@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-import FormData from "form-data";
+import { fetch as undiciFetch, FormData as UndiciFormData } from "undici";
 import { fetch as undiciFetch } from "undici";
 
 const app = express();
@@ -55,7 +55,9 @@ async function huggingfaceFlux(prompt) {
     return `data:image/png;base64,${buffer.toString("base64")}`;
 }
 
-// ---------- STABLE DIFFUSION (STABILITY AI OFICIAL) ----------
+// -------- STABILITY AI — FormData NATIVO DO UNDICI --------
+import { FormData as UndiciFormData, File } from "undici";
+
 async function sdProxy(prompt) {
     const key = process.env.SD_API_KEY;
 
@@ -63,7 +65,7 @@ async function sdProxy(prompt) {
         throw new Error("SD_API_KEY não configurado no Railway");
     }
 
-    const form = new FormData();
+    const form = new UndiciFormData();
     form.append("prompt", prompt);
     form.append("output_format", "webp");
 
@@ -73,8 +75,7 @@ async function sdProxy(prompt) {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${key}`,
-                "Accept": "application/json",   // <<<<<< CORREÇÃO IMPORTANTE
-                ...form.getHeaders()
+                "Accept": "application/json"
             },
             body: form
         }
@@ -89,6 +90,7 @@ async function sdProxy(prompt) {
 
     return `data:image/webp;base64,${data.image}`;
 }
+
 
 
 // ============================================================
