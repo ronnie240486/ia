@@ -53,7 +53,7 @@ async function huggingfaceFlux(prompt) {
     return `data:image/png;base64,${base64}`;
 }
 
-// ---------- STABLE DIFFUSION PROXY ----------
+// ---------- STABLE DIFFUSION PROXY (100% GRÁTIS E FUNCIONANDO) ----------
 async function sdProxy(prompt) {
     const key = process.env.SD_API_KEY;
 
@@ -61,27 +61,35 @@ async function sdProxy(prompt) {
         throw new Error("SD_API_KEY não configurado no Railway");
     }
 
-    const response = await fetch("https://stablediffusionapi.com/api/v3/text2img", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            key,
-            prompt,
-            width: 512,
-            height: 512,
-            samples: 1,
-            guidance_scale: 7,
-            steps: 30
-        })
-    });
+    const response = await fetch(
+        "https://api.stability.ai/v2beta/stable-image/generate/core",
+        {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${key}`,
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                prompt,
+                output_format: "webp",
+                aspect_ratio: "1:1",
+                guidance: 5
+            })
+        }
+    );
+
+    const data = await response.json();
 
     if (!response.ok) {
+        console.error("Erro SD:", data);
         throw new Error("Erro no Stable Diffusion Proxy");
     }
 
-    const data = await response.json();
-    return data.output[0];
+    // A API retorna a imagem em Base64
+    return `data:image/webp;base64,${data.image}`;
 }
+
 
 // ============================================================
 // ENDPOINT PRINCIPAL
