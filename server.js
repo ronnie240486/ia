@@ -1,15 +1,14 @@
 import express from "express";
 import cors from "cors";
-import { fetch, FormData } from "undici"; // único import válido para fetch + FormData
+import { fetch } from "undici";
 
 const app = express();
 app.use(express.json());
 
-// CORS 100% compatível
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    allowedHeaders: ["Content-Type"]
 }));
 
 app.options("*", cors());
@@ -17,85 +16,32 @@ app.options("*", cors());
 const PORT = process.env.PORT || 8080;
 
 // ============================================================
-// PROVIDERS
+// PROVIDERS 100% FREE
 // ============================================================
 
-// ---------- POLLINATIONS ----------
+// ---------- POLLINATIONS (grátis e sem limite) ----------
 function pollinations(prompt) {
     return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
 }
 
-// ---------- HUGGINGFACE FLUX ----------
-async function huggingfaceFlux(prompt) {
-    const HF_TOKEN = process.env.HF_TOKEN;
-    if (!HF_TOKEN) {
-        throw new Error("HF_TOKEN não configurado no Railway");
-    }
+// ---------- FLUX grátis via fal.ai ----------
+async function fluxFree(prompt) {
+    const url = `https://fal.run/fal-ai/flux/schnell`;
 
-    const response = await fetch(
-        "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
-        {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${HF_TOKEN}`,
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ inputs: prompt })
-        }
-    );
-
-    if (!response.ok) {
-        throw new Error("Erro no HuggingFace Flux");
-    }
-
-    const arrayBuffer = await response.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    return `data:image/png;base64,${base64}`;
-}
-
-// ---------- STABLE DIFFUSION PROXY ----------
-async function sdProxy(prompt) {
-    const key = process.env.SD_API_KEY;
-    if (!key) throw new Error("SD_API_KEY não configurado no Railway");
-
-    const form = new FormData();
-    form.append("key", key);
-    form.append("prompt", prompt);
-    form.append("width", "512");
-    form.append("height", "512");
-    form.append("samples", "1");
-    form.append("guidance_scale", "7");
-    form.append("steps", "30");
-
-    const response = await fetch("https://stablediffusionapi.com/api/v3/text2img", {
+    const response = await fetch(url, {
         method: "POST",
-        body: form
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt })
     });
 
-    // 👇 LOG BRUTO PARA DEBUGAR
-    const raw = await response.text();
-    console.log("SD RAW RESPONSE:", raw);
+    const data = await response.json();
 
-    let data;
-    try {
-        data = JSON.parse(raw);
-    } catch (e) {
-        throw new Error("StableDiffusion retornou HTML — API KEY inválida ou servidor em erro.");
+    if (data?.image?.url) {
+        return data.image.url;
     }
 
-    // 👇 Verifica erros retornados pelo SD
-    if (data?.errors) {
-        console.log("Erro SD:", data);
-        throw new Error(data.errors.join(", "));
-    }
-
-    if (!data.output || !data.output[0]) {
-        throw new Error("StableDiffusion não retornou imagem");
-    }
-
-    return data.output[0];
+    throw new Error("Erro ao gerar imagem com FLUX Free fal.ai");
 }
-
 
 // ============================================================
 // ENDPOINT PRINCIPAL
@@ -117,12 +63,8 @@ app.post("/generate-image", async (req, res) => {
                 imageUrl = pollinations(prompt);
                 break;
 
-            case "huggingface-flux":
-                imageUrl = await huggingfaceFlux(prompt);
-                break;
-
-            case "sd-proxy":
-                imageUrl = await sdProxy(prompt);
+            case "flux-free":
+                imageUrl = await fluxFree(prompt);
                 break;
 
             default:
@@ -142,7 +84,7 @@ app.post("/generate-image", async (req, res) => {
 // ============================================================
 
 app.get("/", (req, res) => {
-    res.send("Backend online 🚀");
+    res.send("Backend IA 100% FREE online 🚀");
 });
 
 // ============================================================
