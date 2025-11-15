@@ -1,6 +1,5 @@
 import express from "express";
 import cors from "cors";
-import { fetch } from "undici";
 
 const app = express();
 app.use(express.json());
@@ -10,7 +9,7 @@ app.use(cors({ origin: "*", methods: ["GET", "POST"] }));
 const PORT = process.env.PORT || 8080;
 
 // =============================================================
-// PROVIDERS ★ 10 MODELOS 100% GRATUITOS
+// PROVIDERS ★ MODELOS 100% GRATUITOS E LOCAIS / VERSÁTEIS
 // =============================================================
 
 // 1 — Pollinations
@@ -23,67 +22,67 @@ function pollinationsV2(prompt) {
     return `https://pollinations.ai/p/${encodeURIComponent(prompt)}`;
 }
 
-// 3 — Lexica Search Free
-async function lexica(prompt) {
-    const url = `https://lexica.art/api/v1/search?q=${encodeURIComponent(prompt)}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (!data.images?.length) throw new Error("Nenhuma imagem encontrada na Lexica");
-    return data.images[0].src;
-}
-
-// 4 — Shibe (shiba dogs)
-async function shibe() {
-    const res = await fetch("https://shibe.online/api/shibes");
-    const data = await res.json();
-    return data[0];
-}
-
-// 5 — PlaceKitten
-function placeKitten() {
-    const size = Math.floor(Math.random() * 300) + 300;
-    return `https://placekitten.com/${size}/${size}`;
-}
-
-// 6 — Picsum Photos
+// 3 — Picsum Photos
 function picsum() {
     const size = Math.floor(Math.random() * 500) + 300;
     return `https://picsum.photos/${size}`;
 }
 
-// 7 — Waifu Pics (anime)
-async function waifu() {
-    const res = await fetch("https://api.waifu.pics/sfw/waifu");
-    const data = await res.json();
-    return data.url;
+// 4 — Stable Diffusion v1.5 (placeholder)
+function stableDiffusionV1_5(prompt) {
+    return `stable-diffusion-v1.5://generate?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 8 — Random Fox
-async function randomFox() {
-    const res = await fetch("https://randomfox.ca/floof/");
-    const data = await res.json();
-    return data.image;
+// 5 — Stable Diffusion XL (SDXL) (placeholder)
+function stableDiffusionXL(prompt) {
+    return `stable-diffusion-xl://generate?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 9 — Nekos.best
-async function nekos() {
-    const res = await fetch("https://nekos.best/api/v2/neko");
-    const data = await res.json();
-    return data.results[0].url;
+// 6 — Dreamlike Photoreal 1.0 (placeholder)
+function dreamlike1(prompt) {
+    return `dreamlike-photoreal-1://generate?prompt=${encodeURIComponent(prompt)}`;
 }
 
-// 10 — FakeFace Generator
-async function fakeFace() {
-    const res = await fetch("https://fakeface.rest/face/random");
-    const data = await res.json();
-    return data.image_url;
+// 7 — Dreamlike Photoreal 2.0 (placeholder)
+function dreamlike2(prompt) {
+    return `dreamlike-photoreal-2://generate?prompt=${encodeURIComponent(prompt)}`;
+}
+
+// 8 — Anything v5 / 5.1 (placeholder)
+function anythingV5(prompt) {
+    return `anything-v5://generate?prompt=${encodeURIComponent(prompt)}`;
+}
+
+// 9 — DeepFloyd IF (placeholder)
+function deepFloydIF(prompt) {
+    return `deepfloyd-if://generate?prompt=${encodeURIComponent(prompt)}`;
+}
+
+// 10 — Waifu Diffusion (modo livre, placeholder)
+function waifuDiffusion(prompt) {
+    return `waifu-diffusion://generate?prompt=${encodeURIComponent(prompt)}`;
+}
+
+// 11 — Stable Horde + SD local (placeholder)
+function stableHorde(prompt) {
+    return `stable-horde://generate?prompt=${encodeURIComponent(prompt)}`;
+}
+
+// 12 — BoxDiff (placeholder)
+function boxDiff(prompt) {
+    return `boxdiff://generate?prompt=${encodeURIComponent(prompt)}`;
+}
+
+// 13 — ComfyUI (placeholder)
+function comfyUI(prompt) {
+    return `comfyui://generate?prompt=${encodeURIComponent(prompt)}`;
 }
 
 // =============================================================
 // ENDPOINT PRINCIPAL
 // =============================================================
 
-app.post("/generate-image", async (req, res) => {
+app.post("/generate-image", (req, res) => {
     const { prompt, model } = req.body;
 
     console.log("Modelo recebido:", model);
@@ -94,15 +93,17 @@ app.post("/generate-image", async (req, res) => {
         switch (model) {
             case "pollinations": imageUrl = pollinations(prompt); break;
             case "pollinations-v2": imageUrl = pollinationsV2(prompt); break;
-            case "lexica": imageUrl = await lexica(prompt); break;
-            case "shibe": imageUrl = await shibe(); break;
-            case "kitten": imageUrl = placeKitten(); break;
             case "picsum": imageUrl = picsum(); break;
-            case "waifu": imageUrl = await waifu(); break;
-            case "fox": imageUrl = await randomFox(); break;
-            case "neko": imageUrl = await nekos(); break;
-            case "fakeface": imageUrl = await fakeFace(); break;
-
+            case "stable-v1.5": imageUrl = stableDiffusionV1_5(prompt); break;
+            case "sdxl": imageUrl = stableDiffusionXL(prompt); break;
+            case "dreamlike-1": imageUrl = dreamlike1(prompt); break;
+            case "dreamlike-2": imageUrl = dreamlike2(prompt); break;
+            case "anything-v5": imageUrl = anythingV5(prompt); break;
+            case "deepfloyd-if": imageUrl = deepFloydIF(prompt); break;
+            case "waifu-diffusion": imageUrl = waifuDiffusion(prompt); break;
+            case "stable-horde": imageUrl = stableHorde(prompt); break;
+            case "boxdiff": imageUrl = boxDiff(prompt); break;
+            case "comfyui": imageUrl = comfyUI(prompt); break;
             default:
                 return res.status(400).json({ error: "Modelo desconhecido" });
         }
@@ -119,7 +120,7 @@ app.post("/generate-image", async (req, res) => {
 // =============================================================
 
 app.get("/", (req, res) => {
-    res.send("🚀 Backend 10 MODELOS 100% FREE ONLINE");
+    res.send("🚀 Backend MODELOS 100% FREE ONLINE (Pollinations + Picsum + 10 modelos locais)");
 });
 
 // =============================================================
