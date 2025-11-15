@@ -1,41 +1,17 @@
-import 'dotenv/config';
-import express from "express";
-import fetch from "node-fetch";
-import cors from "cors";
+// CORS 100% compatível com navegador
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+}));
 
-const app = express();
-app.use(express.json());
-app.use(cors({ origin: "*" }));
+app.options("*", cors());
 
-const PORT = process.env.PORT || 8080;
+// Test route for frontend connection
+app.get("/", (req, res) => {
+    res.send("Backend online 🚀");
+});
 
-// ==== Pollinations NOVO ====
-const POLLINATIONS_URL = "https://pollinations.ai/p/";
-
-// ==== DEAPI NOVO ====
-const DEAPI_URL = "https://api.deapi.ai/api/v1/images/text-to-image";
-const DEAPI_API_KEY = process.env.DEAPI_API_KEY;
-
-// Cache simples
-const cache = new Map();
-
-// ======== Pollinations ===========
-function gerarImagemPollinations(prompt) {
-    const url = `${POLLINATIONS_URL}${encodeURIComponent(prompt)}`;
-    return url;
-}
-
-// ======== DEAPI CORRIGIDO ===========
-async function gerarImagemDeAPI(prompt) {
-
-    if (!DEAPI_API_KEY) {
-        throw new Error("DEAPI_API_KEY não configurada no backend.");
-    }
-
-    const response = await fetch(DEAPI_URL, {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${DEAPI_API_KEY}`,
             "Content-Type": "application/json",
         },
         body: JSON.stringify({
