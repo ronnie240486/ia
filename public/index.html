@@ -11,30 +11,12 @@ input, select, button { padding: 8px; margin: 5px; font-size: 16px; }
 </style>
 </head>
 <body>
-<h1>Gerador de Imagens IA - 20 Modelos</h1>
+<h1>Gerador de Imagens IA - API Real</h1>
 
 <input type="text" id="prompt" placeholder="Digite o prompt" size="40">
 <select id="model">
-  <option value="pollinations">Pollinations</option>
-  <option value="pollinations-v2">Pollinations V2</option>
-  <option value="pollinations-legacy">Pollinations Legacy</option>
-  <option value="picsum">Picsum</option>
-  <option value="placeholder">Placeholder.com</option>
-  <option value="placehold-co">Placehold.co</option>
-  <option value="picsum-gray">Picsum Grayscale</option>
-  <option value="picsum-blur">Picsum Blur</option>
-  <option value="dummyimage">DummyImage</option>
-  <option value="placeimg">Placeimg</option>
-  <option value="place-text">Place Text</option>
-  <option value="bacon">Bacon Mockup</option>
-  <option value="placebear">Place Bear</option>
-  <option value="kitten">PlaceKitten</option>
-  <option value="fox">Random Fox</option>
-  <option value="fakeface">FakeFace</option>
-  <option value="placecorgi">PlaceCorgi</option>
-  <option value="placebeard">PlaceBeard</option>
-  <option value="placecat">Random Cat</option>
-  <option value="placedog">Random Dog</option>
+  <option value="huggingface-sd">Stable Diffusion (HuggingFace)</option>
+  <option value="openart">OpenArt Text-to-Image</option>
 </select>
 <button onclick="gerar()">Gerar</button>
 
@@ -49,18 +31,23 @@ async function gerar() {
 
   try {
     const res = await fetch("/generate-image", {
-      method:"POST",
-      headers: { "Content-Type":"application/json" },
-      body: JSON.stringify({prompt, model})
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, model })
     });
+
     const data = await res.json();
-    if (!data.success) { result.innerHTML = "<p>Erro: "+data.error+"</p>"; return; }
+
+    if (!data.success) { 
+      result.innerHTML = "<p>Erro: " + data.error + "</p>"; 
+      return; 
+    }
+
     result.innerHTML = `<img src="${data.imageUrl}" alt="Imagem gerada"/>`;
-  } catch(err){
-    result.innerHTML = "<p>Erro: "+err.message+"</p>";
+  } catch(err) {
+    result.innerHTML = "<p>Erro: " + err.message + "</p>";
   }
 }
 </script>
 </body>
 </html>
-
