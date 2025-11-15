@@ -51,7 +51,7 @@ async function gerarImagemDeAPI(prompt) {
         response = await fetch(DEAPI_BACKEND_URL, {
             method: "POST",
             headers: {
-                Authorization: DEAPI_API_KEY,
+                Authorization: `Bearer ${DEAPI_API_KEY}`,
                 "Content-Type": "application/json",
                 Accept: "application/json",
             },
