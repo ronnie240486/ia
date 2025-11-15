@@ -15,9 +15,9 @@ app.options("*", cors());
 
 const PORT = process.env.PORT || 8080;
 
-// ======================================
+// ============================================================
 // PROVIDERS
-// ======================================
+// ============================================================
 
 // ---------- POLLINATIONS ----------
 function pollinations(prompt) {
@@ -26,17 +26,26 @@ function pollinations(prompt) {
 
 // ---------- HUGGINGFACE FLUX ----------
 async function huggingfaceFlux(prompt) {
-    const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${process.env.HF_TOKEN}`,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ inputs: prompt })
-    });
+    const HF_TOKEN = process.env.HF_TOKEN;
+
+    if (!HF_TOKEN) {
+        throw new Error("HF_TOKEN não configurado no Railway");
+    }
+
+    const response = await fetch(
+        "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell",
+        {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${HF_TOKEN}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ inputs: prompt })
+        }
+    );
 
     if (!response.ok) {
-        throw new Error("Erro no modelo Flux");
+        throw new Error("Erro no HuggingFace Flux");
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -44,13 +53,19 @@ async function huggingfaceFlux(prompt) {
     return `data:image/png;base64,${base64}`;
 }
 
-// ---------- STABLE DIFFUSION ----------
+// ---------- STABLE DIFFUSION PROXY ----------
 async function sdProxy(prompt) {
+    const key = process.env.SD_API_KEY;
+
+    if (!key) {
+        throw new Error("SD_API_KEY não configurado no Railway");
+    }
+
     const response = await fetch("https://stablediffusionapi.com/api/v3/text2img", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-            key: process.env.SD_API_KEY,
+            key,
             prompt,
             width: 512,
             height: 512,
@@ -60,15 +75,17 @@ async function sdProxy(prompt) {
         })
     });
 
-    if (!response.ok) throw new Error("Erro no Stable Diffusion");
+    if (!response.ok) {
+        throw new Error("Erro no Stable Diffusion Proxy");
+    }
 
     const data = await response.json();
     return data.output[0];
 }
 
-// ======================================
+// ============================================================
 // ENDPOINT PRINCIPAL
-// ======================================
+// ============================================================
 
 app.post("/generate-image", async (req, res) => {
     const { prompt, model } = req.body;
@@ -82,22 +99,15 @@ app.post("/generate-image", async (req, res) => {
         let imageUrl;
 
         switch (model) {
-
             case "pollinations":
                 imageUrl = pollinations(prompt);
                 break;
 
-            case "flux":
-                if (!process.env.HF_TOKEN)
-                    return res.status(500).json({ error: "HF_TOKEN não configurado no Railway" });
-
+            case "huggingface-flux":
                 imageUrl = await huggingfaceFlux(prompt);
                 break;
 
-            case "sd":
-                if (!process.env.SD_API_KEY)
-                    return res.status(500).json({ error: "SD_API_KEY não configurado no Railway" });
-
+            case "sd-proxy":
                 imageUrl = await sdProxy(prompt);
                 break;
 
@@ -109,18 +119,16 @@ app.post("/generate-image", async (req, res) => {
 
     } catch (err) {
         console.error("Erro ao gerar imagem:", err);
-        return res.status(500).json({ error: err.message });
+        res.status(500).json({ error: err.message });
     }
 });
 
-// ======================================
-// ROTA TESTE
-// ======================================
+// ============================================================
 app.get("/", (req, res) => {
     res.send("Backend online 🚀");
 });
+// ============================================================
 
-// ======================================
 app.listen(PORT, () => {
     console.log(`Servidor iniciado na porta ${PORT}`);
 });
