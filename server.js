@@ -73,7 +73,8 @@ async function sdProxy(prompt) {
             method: "POST",
             headers: {
                 "Authorization": `Bearer ${key}`,
-                ...form.getHeaders() // *** IMPORTANTE ***
+                "Accept": "application/json",   // <<<<<< CORREÇÃO IMPORTANTE
+                ...form.getHeaders()
             },
             body: form
         }
@@ -88,6 +89,7 @@ async function sdProxy(prompt) {
 
     return `data:image/webp;base64,${data.image}`;
 }
+
 
 // ============================================================
 // ENDPOINT PRINCIPAL
