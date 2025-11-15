@@ -45,7 +45,14 @@ async function gerar() {
       return;
     }
 
-    result.innerHTML = `<img src="${data.imageUrl}" alt="Imagem gerada"/>`;
+    let imgSrc = data.imageUrl;
+
+    // Se a Hugging Face retornar base64
+    if (imgSrc.startsWith("iVBOR") || imgSrc.startsWith("/9j/")) {
+      imgSrc = `data:image/png;base64,${imgSrc}`;
+    }
+
+    result.innerHTML = `<img src="${imgSrc}" alt="Imagem gerada"/>`;
   } catch(err){
     result.innerHTML = "<p>Erro: " + err.message + "</p>";
   }
