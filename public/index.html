@@ -11,12 +11,14 @@ input, select, button { padding: 8px; margin: 5px; font-size: 16px; }
 </style>
 </head>
 <body>
-<h1>Gerador de Imagens IA - API Real</h1>
+<h1>Gerador de Imagens IA - Modelos Confiáveis</h1>
 
 <input type="text" id="prompt" placeholder="Digite o prompt" size="40">
 <select id="model">
   <option value="huggingface-sd">Stable Diffusion (HuggingFace)</option>
   <option value="openart">OpenArt Text-to-Image</option>
+  <option value="pollinations">Pollinations</option>
+  <option value="pollinations-v2">Pollinations V2</option>
 </select>
 <button onclick="gerar()">Gerar</button>
 
@@ -31,20 +33,20 @@ async function gerar() {
 
   try {
     const res = await fetch("/generate-image", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method:"POST",
+      headers: { "Content-Type":"application/json" },
       body: JSON.stringify({ prompt, model })
     });
 
     const data = await res.json();
 
-    if (!data.success) { 
-      result.innerHTML = "<p>Erro: " + data.error + "</p>"; 
-      return; 
+    if (!data.success) {
+      result.innerHTML = "<p>Erro: " + data.error + "</p>";
+      return;
     }
 
     result.innerHTML = `<img src="${data.imageUrl}" alt="Imagem gerada"/>`;
-  } catch(err) {
+  } catch(err){
     result.innerHTML = "<p>Erro: " + err.message + "</p>";
   }
 }
