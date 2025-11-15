@@ -4,129 +4,123 @@ import fetch from "node-fetch";
 
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: "*" }));
+
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+app.options("*", cors());
 
 const PORT = process.env.PORT || 8080;
 
-// ------------------------------------------------------------
-// MODEL 1 — POLLINATIONS (FREE, INSTANT, UNLIMITED)
-// ------------------------------------------------------------
+// ======================================
+// PROVIDERS
+// ======================================
+
+// ---------- POLLINATIONS ----------
 function pollinations(prompt) {
     return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
 }
 
-// ------------------------------------------------------------
-// MODEL 2 — FLUX (HuggingFace Public Space - FREE)
-// ------------------------------------------------------------
-async function flux(prompt) {
-    const response = await fetch(
-        "https://hf.space/embed/black-forest-labs/FLUX.1-schnell/+/api/predict/",
-        {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data: [prompt] })
-        }
-    );
+// ---------- HUGGINGFACE FLUX ----------
+async function huggingfaceFlux(prompt) {
+    const response = await fetch("https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${process.env.HF_TOKEN}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ inputs: prompt })
+    });
 
-    const json = await response.json();
-
-    if (!json?.data?.[0]?.url) {
-        throw new Error("Flux não retornou imagem.");
+    if (!response.ok) {
+        throw new Error("Erro no modelo Flux");
     }
 
-    return json.data[0].url;
-}
-
-// ------------------------------------------------------------
-// MODEL 3 — STABLE DIFFUSION GRÁTIS VIA PROXY HF
-// ------------------------------------------------------------
-async function stableDiffusion(prompt) {
-    const response = await fetch(
-        "https://api-inference.huggingface.co/models/CompVis/stable-diffusion-v1-4",
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-                // Sem chave → usa proxy público gratuito
-            },
-            body: JSON.stringify({ inputs: prompt })
-        }
-    );
-
-    const blob = await response.blob();
-    const arrayBuffer = await blob.arrayBuffer();
+    const arrayBuffer = await response.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString("base64");
-
     return `data:image/png;base64,${base64}`;
 }
 
-// ------------------------------------------------------------
-// AUTO MODE — TENTA TODOS EM ORDEM
-// ------------------------------------------------------------
-async function autoMode(prompt) {
-    try { return { provider: "pollinations", url: pollinations(prompt) }; }
-    catch {}
+// ---------- STABLE DIFFUSION ----------
+async function sdProxy(prompt) {
+    const response = await fetch("https://stablediffusionapi.com/api/v3/text2img", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            key: process.env.SD_API_KEY,
+            prompt,
+            width: 512,
+            height: 512,
+            samples: 1,
+            guidance_scale: 7,
+            steps: 30
+        })
+    });
 
-    try { return { provider: "flux", url: await flux(prompt) }; }
-    catch {}
+    if (!response.ok) throw new Error("Erro no Stable Diffusion");
 
-    try { return { provider: "stable-diffusion", url: await stableDiffusion(prompt) }; }
-    catch {}
-
-    return { provider: "fallback", url: pollinations(prompt) };
+    const data = await response.json();
+    return data.output[0];
 }
 
-// ------------------------------------------------------------
+// ======================================
 // ENDPOINT PRINCIPAL
-// ------------------------------------------------------------
-app.post("/generate-image", async (req, res) => {
-    const { prompt, model = "auto" } = req.body;
+// ======================================
 
-    if (!prompt) {
-        return res.status(400).json({ error: "prompt é obrigatório" });
-    }
+app.post("/generate-image", async (req, res) => {
+    const { prompt, model } = req.body;
+
+    if (!prompt) return res.status(400).json({ error: "prompt é obrigatório" });
+    if (!model) return res.status(400).json({ error: "model é obrigatório" });
+
+    console.log("Modelo recebido:", model);
 
     try {
-        let imageUrl, provider;
+        let imageUrl;
 
         switch (model) {
+
             case "pollinations":
-                provider = "pollinations";
                 imageUrl = pollinations(prompt);
                 break;
 
             case "flux":
-                provider = "flux";
-                imageUrl = await flux(prompt);
+                if (!process.env.HF_TOKEN)
+                    return res.status(500).json({ error: "HF_TOKEN não configurado no Railway" });
+
+                imageUrl = await huggingfaceFlux(prompt);
                 break;
 
             case "sd":
-            case "stable-diffusion":
-                provider = "stable-diffusion";
-                imageUrl = await stableDiffusion(prompt);
+                if (!process.env.SD_API_KEY)
+                    return res.status(500).json({ error: "SD_API_KEY não configurado no Railway" });
+
+                imageUrl = await sdProxy(prompt);
                 break;
 
             default:
-                const autoResult = await autoMode(prompt);
-                provider = autoResult.provider;
-                imageUrl = autoResult.url;
+                return res.status(400).json({ error: "Modelo desconhecido" });
         }
 
-        return res.json({ success: true, provider, imageUrl });
+        return res.json({ success: true, model, imageUrl });
 
     } catch (err) {
-        return res.status(500).json({
-            success: false,
-            error: err.message,
-        });
+        console.error("Erro ao gerar imagem:", err);
+        return res.status(500).json({ error: err.message });
     }
 });
 
-// ------------------------------------------------------------
-// STATUS ROUTE
-// ------------------------------------------------------------
+// ======================================
+// ROTA TESTE
+// ======================================
 app.get("/", (req, res) => {
-    res.send("🔥 Multi-model Image API (Free) Online!");
+    res.send("Backend online 🚀");
 });
 
-app.listen(PORT, () => console.log(`🚀 Server online na porta ${PORT}`));
+// ======================================
+app.listen(PORT, () => {
+    console.log(`Servidor iniciado na porta ${PORT}`);
+});
