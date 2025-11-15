@@ -16,55 +16,44 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 8080;
 
+// ================= MODELOS CONFIÁVEIS =================
 const MODELS = {
-  "huggingface-sd": "stable-diffusion-v1-5",
-  "openart": "openart-text2img"
+  "huggingface-sd": async (prompt) => {
+    const res = await fetch("https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.HF_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ inputs: prompt })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    return data[0]?.url || null;
+  },
+  "openart": async (prompt) => {
+    const res = await fetch("https://openart.ai/api/v1/text-to-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await res.json();
+    if (!data.url) throw new Error("Não foi possível gerar a imagem");
+    return data.url;
+  },
+  "pollinations": (prompt) => `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`,
+  "pollinations-v2": (prompt) => `https://pollinations.ai/p/${encodeURIComponent(prompt)}`
 };
 
-// Endpoint para gerar imagem
+// ================= ENDPOINT =================
 app.post("/generate-image", async (req, res) => {
   const { prompt, model } = req.body;
-
-  if (!prompt) return res.status(400).json({ error: "Prompt não definido" });
+  const fn = MODELS[model];
+  if (!fn) return res.status(400).json({ error: "Modelo desconhecido" });
 
   try {
-    let imageUrl;
-
-    if (model === "huggingface-sd") {
-      const response = await fetch(`https://api-inference.huggingface.co/models/${MODELS[model]}`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.HF_API_KEY}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ inputs: prompt })
-      });
-
-      const data = await response.json();
-
-      if (data.error) throw new Error(data.error);
-
-      // Hugging Face retorna base64 ou URL dependendo do modelo
-      imageUrl = data[0]?.url || null;
-      if (!imageUrl) throw new Error("Não foi possível gerar imagem");
-    }
-
-    else if (model === "openart") {
-      const response = await fetch("https://openart.ai/api/v1/text-to-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt })
-      });
-
-      const data = await response.json();
-      imageUrl = data?.url || null;
-      if (!imageUrl) throw new Error("Não foi possível gerar imagem");
-    }
-
-    else return res.status(400).json({ error: "Modelo desconhecido" });
-
+    const imageUrl = await fn(prompt);
     res.json({ success: true, model, imageUrl });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
