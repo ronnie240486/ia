@@ -1,10 +1,11 @@
 import express from "express";
 import cors from "cors";
-import { fetch, FormData } from "undici"; // ✔ único import correto para Node 18+
+import { fetch, FormData } from "undici"; // único import válido para fetch + FormData
 
 const app = express();
 app.use(express.json());
 
+// CORS 100% compatível
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
@@ -27,7 +28,6 @@ function pollinations(prompt) {
 // ---------- HUGGINGFACE FLUX ----------
 async function huggingfaceFlux(prompt) {
     const HF_TOKEN = process.env.HF_TOKEN;
-
     if (!HF_TOKEN) {
         throw new Error("HF_TOKEN não configurado no Railway");
     }
@@ -53,39 +53,33 @@ async function huggingfaceFlux(prompt) {
     return `data:image/png;base64,${base64}`;
 }
 
-// ---------- STABLE DIFFUSION PROXY (STABILITY AI CORE) ----------
+// ---------- STABLE DIFFUSION PROXY ----------
 async function sdProxy(prompt) {
     const key = process.env.SD_API_KEY;
+    if (!key) throw new Error("SD_API_KEY não configurado no Railway");
 
-    if (!key) {
-        throw new Error("SD_API_KEY não configurado no Railway");
-    }
-
-    // ✔ FormData totalmente compatível com API da Stability
     const form = new FormData();
+    form.append("key", key);
     form.append("prompt", prompt);
-    form.append("output_format", "webp");
+    form.append("width", "512");
+    form.append("height", "512");
+    form.append("samples", "1");
+    form.append("guidance_scale", "7");
+    form.append("steps", "30");
 
-    const response = await fetch(
-        "https://api.stability.ai/v2beta/stable-image/generate/core",
-        {
-            method: "POST",
-            headers: {
-                "Authorization": `Bearer ${key}`,
-                "Accept": "application/json"
-            },
-            body: form
-        }
-    );
+    const response = await fetch("https://stablediffusionapi.com/api/v3/text2img", {
+        method: "POST",
+        body: form
+    });
 
     const data = await response.json();
+    console.log("Erro SD:", data);
 
-    if (!response.ok) {
-        console.error("Erro SD:", data);
+    if (data?.errors) {
         throw new Error("Erro no Stable Diffusion Proxy");
     }
 
-    return `data:image/webp;base64,${data.image}`;
+    return data.output[0];
 }
 
 // ============================================================
@@ -129,12 +123,17 @@ app.post("/generate-image", async (req, res) => {
 });
 
 // ============================================================
+// ROTA TESTE
+// ============================================================
+
 app.get("/", (req, res) => {
     res.send("Backend online 🚀");
 });
+
+// ============================================================
+// START SERVER
 // ============================================================
 
 app.listen(PORT, () => {
     console.log(`Servidor iniciado na porta ${PORT}`);
 });
-
