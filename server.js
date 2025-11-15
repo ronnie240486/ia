@@ -1,13 +1,10 @@
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
-import { fetch as undiciFetch, FormData as UndiciFormData } from "undici";
-import { fetch as undiciFetch } from "undici";
+import { fetch, FormData } from "undici"; // ✔ único import correto para Node 18+
 
 const app = express();
 app.use(express.json());
 
-// CORS universal
 app.use(cors({
     origin: "*",
     methods: ["GET", "POST", "OPTIONS"],
@@ -51,13 +48,12 @@ async function huggingfaceFlux(prompt) {
         throw new Error("Erro no HuggingFace Flux");
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    return `data:image/png;base64,${buffer.toString("base64")}`;
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    return `data:image/png;base64,${base64}`;
 }
 
-// -------- STABILITY AI — FormData NATIVO DO UNDICI --------
-import { FormData as UndiciFormData, File } from "undici";
-
+// ---------- STABLE DIFFUSION PROXY (STABILITY AI CORE) ----------
 async function sdProxy(prompt) {
     const key = process.env.SD_API_KEY;
 
@@ -65,11 +61,12 @@ async function sdProxy(prompt) {
         throw new Error("SD_API_KEY não configurado no Railway");
     }
 
-    const form = new UndiciFormData();
+    // ✔ FormData totalmente compatível com API da Stability
+    const form = new FormData();
     form.append("prompt", prompt);
     form.append("output_format", "webp");
 
-    const response = await undiciFetch(
+    const response = await fetch(
         "https://api.stability.ai/v2beta/stable-image/generate/core",
         {
             method: "POST",
@@ -90,8 +87,6 @@ async function sdProxy(prompt) {
 
     return `data:image/webp;base64,${data.image}`;
 }
-
-
 
 // ============================================================
 // ENDPOINT PRINCIPAL
@@ -134,18 +129,12 @@ app.post("/generate-image", async (req, res) => {
 });
 
 // ============================================================
-// ROTA TESTE
-// ============================================================
 app.get("/", (req, res) => {
     res.send("Backend online 🚀");
 });
+// ============================================================
 
-// ============================================================
-// START SERVER
-// ============================================================
 app.listen(PORT, () => {
     console.log(`Servidor iniciado na porta ${PORT}`);
-    console.log("POLLINATIONS: OK (sempre funciona)");
-    console.log("HF_TOKEN:", process.env.HF_TOKEN ? "OK" : "MISSING");
-    console.log("SD_API_KEY:", process.env.SD_API_KEY ? "OK" : "MISSING");
 });
+
